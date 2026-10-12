@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sales Insight: Aplikasi Web Analisis Penjualan UMKM dengan Asisten Berbasis Aturan</title>
+<style>
+/* ── CSS Custom Properties ─────────────────────────────────────── */
+:root{
+  --bg:#ffffff;--surface:#f7f8fa;--border:#e5e7eb;
+  --text:#1f2328;--muted:#57606a;--accent:#3b82d4;--accent-dark:#2563b8;
+  --danger:#dc2626;--warn:#d97706;--ok:#16a34a;
+  --radius:8px;--shadow:0 1px 4px rgba(0,0,0,.08);
+  --font:-apple-system,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:15px;line-height:1.6;background:var(--bg);color:var(--text);}
+a{color:var(--accent);}
+button{cursor:pointer;font-family:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;min-height:100vh;}
+
+/* ── Top bar ───────────────────────────────────────────────────── */
+#topbar{
+  background:var(--accent);color:#fff;
+  padding:.6rem 1.2rem;display:flex;align-items:center;gap:1rem;
+  flex-wrap:wrap;
+}
+#topbar h1{font-size:1.1rem;font-weight:700;letter-spacing:.01em;flex:1;}
+#sim-badge{
+  background:#fff3;border:1px solid #fff8;color:#fff;
+  font-size:.72rem;font-weight:600;padding:.2rem .5rem;border-radius:4px;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+#data-badge{font-size:.8rem;padding:.25rem .6rem;border-radius:4px;background:#fff2;border:1px solid #fff6;}
+#data-badge.ready{background:#16a34a22;border-color:#16a34a88;color:#d1fae5;}
+#data-badge.not-ready{background:#d9770622;border-color:#d9770688;color:#fef3c7;}
+
+/* ── Nav ───────────────────────────────────────────────────────── */
+nav{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;gap:0;overflow-x:auto;
+}
+nav button{
+  background:none;border:none;padding:.65rem 1.2rem;
+  font-size:.9rem;color:var(--muted);font-weight:500;white-space:nowrap;
+  border-bottom:3px solid transparent;transition:color .15s,border-color .15s;
+}
+nav button:hover{color:var(--text);}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── Main content ──────────────────────────────────────────────── */
+main{flex:1;padding:1.2rem;max-width:1200px;width:100%;margin:0 auto;}
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── Dataset bar ───────────────────────────────────────────────── */
+#dataset-bar{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.75rem 1rem;margin-bottom:1.2rem;display:flex;align-items:center;
+  gap:.75rem;flex-wrap:wrap;
+}
+#dataset-bar .ds-label{font-size:.82rem;color:var(--muted);}
+#dataset-bar .ds-status{font-size:.82rem;font-weight:600;}
+.ds-status.loaded{color:var(--ok);}
+.ds-status.empty{color:var(--warn);}
+#btn-load-default,#btn-upload-trigger{
+  background:var(--accent);color:#fff;border:none;
+  padding:.35rem .85rem;border-radius:6px;font-size:.82rem;
+}
+#btn-load-default:hover,#btn-upload-trigger:hover{background:var(--accent-dark);}
+#upload-form{display:none;}
+
+/* ── Validation panel ──────────────────────────────────────────── */
+#validation-panel{
+  background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius);
+  padding:.75rem 1rem;margin-bottom:1rem;
+}
+#validation-panel h3{color:var(--danger);font-size:.9rem;margin-bottom:.4rem;}
+#validation-list{font-size:.82rem;color:var(--danger);line-height:1.8;max-height:160px;overflow-y:auto;}
+
+/* ── Filter bar ────────────────────────────────────────────────── */
+#filter-bar{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.75rem 1rem;margin-bottom:1.2rem;display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;
+}
+.filter-group{display:flex;flex-direction:column;gap:.2rem;}
+.filter-group label{font-size:.78rem;color:var(--muted);font-weight:600;}
+.filter-group input,.filter-group select{
+  padding:.32rem .55rem;border:1px solid var(--border);border-radius:6px;
+  font-size:.83rem;background:#fff;color:var(--text);font-family:inherit;
+}
+#btn-apply-filter{
+  background:var(--accent);color:#fff;border:none;
+  padding:.38rem 1rem;border-radius:6px;font-size:.83rem;align-self:flex-end;
+}
+#btn-apply-filter:hover{background:var(--accent-dark);}
+#btn-reset-filter{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  padding:.38rem .85rem;border-radius:6px;font-size:.83rem;align-self:flex-end;
+}
+
+/* ── Metric cards ──────────────────────────────────────────────── */
+#metrics-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;
+  margin-bottom:1.4rem;
+}
+.metric-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem 1.1rem;
+}
+.metric-card .m-label{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.metric-card .m-value{font-size:1.6rem;font-weight:700;color:var(--text);margin:.2rem 0 .1rem;}
+.metric-card .m-sub{font-size:.76rem;color:var(--muted);}
+
+/* ── Charts grid ───────────────────────────────────────────────── */
+#charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.2rem;margin-bottom:1.4rem;}
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;
+}
+.chart-card h3{font-size:.88rem;font-weight:700;margin-bottom:.6rem;color:var(--text);}
+.chart-card .chart-note{font-size:.74rem;color:var(--muted);margin-top:.4rem;}
+.chart-card .chart-area{position:relative;width:100%;overflow:hidden;}
+svg.chart-svg{display:block;width:100%;overflow:visible;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+
+/* tooltip */
+#chart-tooltip{
+  position:fixed;background:#1f2328ee;color:#fff;
+  padding:.4rem .7rem;border-radius:6px;font-size:.78rem;
+  pointer-events:none;opacity:0;transition:opacity .1s;z-index:9999;white-space:nowrap;
+}
+
+/* ── Chart summary tables ──────────────────────────────────────── */
+.chart-table-wrap{margin-top:.6rem;overflow-x:auto;}
+.chart-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.chart-table th{text-align:left;padding:.25rem .5rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);}
+.chart-table td{padding:.22rem .5rem;border-bottom:1px solid #f0f0f0;}
+
+/* ── Period comparison ─────────────────────────────────────────── */
+#compare-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;}
+#compare-section h2{font-size:.95rem;font-weight:700;margin-bottom:.8rem;}
+#compare-inputs{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem;}
+.period-block{border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .75rem;display:flex;flex-direction:column;gap:.4rem;background:#fff;}
+.period-block legend{font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.2rem;}
+.period-block .pr{display:flex;gap:.5rem;align-items:center;font-size:.82rem;}
+#btn-compare{
+  background:var(--accent);color:#fff;border:none;
+  padding:.4rem 1.1rem;border-radius:6px;font-size:.83rem;margin-top:.3rem;align-self:flex-start;
+}
+#compare-result{margin-top:.75rem;}
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;}
+.compare-cell{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:.75rem .9rem;}
+.compare-cell .cc-label{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;}
+.compare-cell .cc-vals{display:flex;gap:.5rem;margin:.3rem 0 .2rem;align-items:baseline;}
+.compare-cell .cc-v1{font-size:1rem;font-weight:700;}
+.compare-cell .cc-v2{font-size:1rem;font-weight:700;color:var(--accent);}
+.compare-cell .cc-arr{font-size:.9rem;}
+.compare-cell .cc-pct{font-size:.8rem;font-weight:600;}
+.cc-pct.up{color:var(--ok);}
+.cc-pct.dn{color:var(--danger);}
+.cc-pct.na{color:var(--muted);}
+
+/* ── Data page ─────────────────────────────────────────────────── */
+#data-controls{display:flex;gap:.75rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;}
+#data-search{
+  flex:1;min-width:180px;padding:.35rem .65rem;border:1px solid var(--border);
+  border-radius:6px;font-size:.83rem;font-family:inherit;
+}
+#data-page-size{padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;}
+#data-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);}
+table#data-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+#data-table th{
+  background:var(--surface);padding:.45rem .65rem;text-align:left;
+  font-weight:700;font-size:.76rem;color:var(--muted);border-bottom:1px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;
+}
+#data-table td{padding:.38rem .65rem;border-bottom:1px solid #f0f0f0;white-space:nowrap;}
+#data-table tr:hover{background:var(--surface);}
+#pagination{display:flex;gap:.4rem;align-items:center;margin-top:.75rem;flex-wrap:wrap;}
+#pagination button{
+  background:var(--surface);border:1px solid var(--border);padding:.3rem .65rem;
+  border-radius:5px;font-size:.78rem;
+}
+#pagination button:hover{background:var(--border);}
+#pagination button.current{background:var(--accent);color:#fff;border-color:var(--accent);}
+#pagination-info{font-size:.78rem;color:var(--muted);margin-left:.3rem;}
+#export-bar{display:flex;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap;}
+#export-bar button{
+  background:none;border:1px solid var(--accent);color:var(--accent);
+  padding:.35rem .8rem;border-radius:6px;font-size:.8rem;
+}
+#export-bar button:hover{background:var(--accent);color:#fff;}
+
+/* ── AI Chat page ──────────────────────────────────────────────── */
+#chat-layout{display:grid;grid-template-columns:1fr 280px;gap:1.2rem;}
+@media(max-width:700px){#chat-layout{grid-template-columns:1fr;}}
+#chat-main{display:flex;flex-direction:column;gap:.75rem;}
+#chat-history{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.75rem;min-height:220px;max-height:420px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:.75rem;
+}
+.chat-msg{padding:.6rem .8rem;border-radius:var(--radius);max-width:88%;font-size:.85rem;line-height:1.55;}
+.chat-msg.user{background:var(--accent);color:#fff;align-self:flex-end;}
+.chat-msg.assistant{background:#fff;border:1px solid var(--border);align-self:flex-start;}
+.chat-msg.system{background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:.78rem;align-self:center;max-width:100%;}
+.chat-msg .msg-steps{margin-top:.5rem;font-size:.74rem;color:var(--muted);border-top:1px solid var(--border);padding-top:.4rem;}
+.msg-steps summary{cursor:pointer;font-weight:600;}
+.msg-steps details{margin-top:.3rem;}
+#chat-input-row{display:flex;gap:.5rem;}
+#chat-input{
+  flex:1;padding:.45rem .75rem;border:1px solid var(--border);border-radius:6px;
+  font-size:.85rem;font-family:inherit;resize:none;height:42px;
+}
+#btn-send{
+  background:var(--accent);color:#fff;border:none;
+  padding:.45rem 1.1rem;border-radius:6px;font-size:.85rem;
+}
+#btn-send:hover{background:var(--accent-dark);}
+#chat-loading{display:none;font-size:.8rem;color:var(--muted);padding:.3rem 0;}
+#chat-sidebar{}
+#sample-questions{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;}
+#sample-questions h4{font-size:.82rem;font-weight:700;margin-bottom:.6rem;color:var(--muted);}
+.sample-q{
+  display:block;width:100%;text-align:left;background:#fff;
+  border:1px solid var(--border);border-radius:6px;padding:.38rem .65rem;
+  font-size:.78rem;margin-bottom:.4rem;color:var(--text);
+}
+.sample-q:hover{border-color:var(--accent);color:var(--accent);}
+#data-status-card{
+  background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);
+  padding:.7rem;font-size:.78rem;color:#166534;margin-top:.75rem;line-height:1.6;
+}
+#data-status-card.not-ready{background:#fffbeb;border-color:#fde68a;color:#92400e;}
+/* follow-up suggestion buttons */
+#followup-area{margin-top:.6rem;}
+#followup-area p{font-size:.76rem;color:var(--muted);margin-bottom:.3rem;}
+.followup-btn{
+  display:block;width:100%;text-align:left;background:#f0f7ff;
+  border:1px solid #bfdbfe;border-radius:6px;padding:.38rem .65rem;
+  font-size:.78rem;margin-bottom:.4rem;color:var(--accent);
+}
+.followup-btn:hover{background:#dbeafe;border-color:var(--accent);}
+/* markdown-style bold in chat */
+.chat-msg b{font-weight:700;}
+
+/* ── Loading skeleton ──────────────────────────────────────────── */
+.skeleton{
+  background:linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%);
+  background-size:200% 100%;animation:skel 1.2s infinite;border-radius:4px;
+}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-line{height:1em;margin:.3rem 0;}
+.skel-card{height:80px;border-radius:var(--radius);margin:.5rem 0;}
+
+/* ── Empty / error state ───────────────────────────────────────── */
+.empty-state{
+  text-align:center;padding:2.5rem 1rem;color:var(--muted);
+  border:2px dashed var(--border);border-radius:var(--radius);
+}
+.empty-state h3{font-size:1rem;margin-bottom:.4rem;}
+
+/* ── Utility ───────────────────────────────────────────────────── */
+.hide{display:none!important;}
+.text-ok{color:var(--ok);}
+.text-warn{color:var(--warn);}
+.text-danger{color:var(--danger);}
+.mt-1{margin-top:.5rem;}
+.fw-bold{font-weight:700;}
+hr.sect{border:none;border-top:1px solid var(--border);margin:1.2rem 0;}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media(max-width:600px){
+  #filter-bar{flex-direction:column;}
+  #compare-inputs{flex-direction:column;}
+  .m-value{font-size:1.3rem;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── TOP BAR ─────────────────────────────────────────────── -->
+<header id="topbar" role="banner">
+  <h1>📊 Sales Insight — Kedai Rasa Kita</h1>
+  <span id="sim-badge" aria-label="Data simulasi, bukan transaksi nyata">Data Simulasi</span>
+  <span id="data-badge" class="not-ready" aria-live="polite">Dataset belum dimuat</span>
+</header>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav role="navigation" aria-label="Navigasi utama">
+  <button class="active" data-page="dashboard" aria-controls="page-dashboard">Dashboard</button>
+  <button data-page="data"      aria-controls="page-data">Data</button>
+  <button data-page="agent"     aria-controls="page-agent">Tanya Data</button>
+</nav>
+
+<!-- ── MAIN ────────────────────────────────────────────────── -->
+<main role="main">
+
+  <!-- ══════════════════════════════════════════════════════════
+       SHARED: dataset bar + filter bar (shown on all pages)
+  ══════════════════════════════════════════════════════════ -->
+  <section id="dataset-bar" aria-label="Status dataset">
+    <span class="ds-label">Dataset:</span>
+    <span id="ds-status" class="ds-status empty">Belum dimuat</span>
+    <span id="ds-info" style="font-size:.8rem;color:var(--muted);"></span>
+    <button id="btn-load-default" aria-label="Gunakan data contoh">Gunakan Data Contoh</button>
+    <button id="btn-upload-trigger" aria-label="Unggah CSV baru">Unggah CSV</button>
+    <form id="upload-form" aria-hidden="true">
+      <input type="file" id="csv-file-input" accept=".csv" aria-label="Pilih file CSV"/>
+    </form>
+  </section>
+
+  <section id="validation-panel" class="hide" aria-live="assertive" role="alert">
+    <h3>⚠️ Validasi gagal — dataset tidak dimuat</h3>
+    <div id="validation-list"></div>
+  </section>
+
+  <section id="filter-bar" aria-label="Filter data">
+    <div class="filter-group">
+      <label for="f-date-from">Dari Tanggal</label>
+      <input type="date" id="f-date-from" name="f-date-from"/>
+    </div>
+    <div class="filter-group">
+      <label for="f-date-to">Sampai Tanggal</label>
+      <input type="date" id="f-date-to" name="f-date-to"/>
+    </div>
+    <div class="filter-group">
+      <label for="f-kategori">Kategori</label>
+      <select id="f-kategori" name="f-kategori">
+        <option value="">Semua Kategori</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="f-kanal">Kanal Penjualan</label>
+      <select id="f-kanal" name="f-kanal">
+        <option value="">Semua Kanal</option>
+      </select>
+    </div>
+    <button id="btn-apply-filter">Terapkan Filter</button>
+    <button id="btn-reset-filter" type="button">Reset</button>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE: DASHBOARD
+  ══════════════════════════════════════════════════════════ -->
+  <section id="page-dashboard" class="page active" role="region" aria-labelledby="lbl-dashboard">
+    <h2 id="lbl-dashboard" class="sr-only">Dashboard Penjualan</h2>
+
+    <!-- Metric cards -->
+    <div id="metrics-grid" aria-label="Kartu metrik utama">
+      <div class="metric-card">
+        <div class="m-label">Total Penjualan (setelah diskon)</div>
+        <div class="m-value" id="m-total">—</div>
+        <div class="m-sub">Pendapatan kotor setelah potongan diskon</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Jumlah Transaksi Unik</div>
+        <div class="m-value" id="m-trx">—</div>
+        <div class="m-sub">Berdasarkan id_transaksi unik</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Jumlah Unit Terjual</div>
+        <div class="m-value" id="m-units">—</div>
+        <div class="m-sub">Total semua item dalam periode</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Rata-rata Nilai Transaksi</div>
+        <div class="m-value" id="m-avg">—</div>
+        <div class="m-sub">Total penjualan ÷ jumlah transaksi unik</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div id="charts-grid">
+
+      <!-- Trend chart -->
+      <div class="chart-card" style="grid-column:1/-1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
+          <h3>Tren Penjualan <span id="trend-label" style="font-weight:400;color:var(--muted);"></span></h3>
+          <div style="display:flex;gap:.4rem;">
+            <label style="font-size:.78rem;display:flex;align-items:center;gap:.3rem;">
+              <input type="radio" name="granularity" value="harian" checked/> Harian
+            </label>
+            <label style="font-size:.78rem;display:flex;align-items:center;gap:.3rem;">
+              <input type="radio" name="granularity" value="bulanan"/> Bulanan
+            </label>
+          </div>
+        </div>
+        <div class="chart-area" style="height:220px;">
+          <svg id="chart-trend" class="chart-svg" role="img" aria-label="Grafik tren penjualan harian atau bulanan"></svg>
+        </div>
+        <p class="chart-note">Satuan: total penjualan (Rp) setelah diskon. Bukan laba.</p>
+        <div class="chart-table-wrap" aria-label="Tabel tren penjualan">
+          <table class="chart-table" id="tbl-trend">
+            <caption class="sr-only">Data tren penjualan</caption>
+            <thead><tr><th>Periode</th><th>Total Penjualan (Rp)</th><th>Transaksi</th><th>Unit</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top products chart -->
+      <div class="chart-card">
+        <h3>Produk Terlaris <span style="font-weight:400;font-size:.8rem;color:var(--muted);">(unit terjual)</span></h3>
+        <div class="chart-area" style="height:200px;">
+          <svg id="chart-products" class="chart-svg" role="img" aria-label="Grafik produk terlaris berdasarkan unit terjual"></svg>
+        </div>
+        <p class="chart-note">Satuan: jumlah unit terjual per produk.</p>
+        <div class="chart-table-wrap" aria-label="Tabel produk terlaris">
+          <table class="chart-table" id="tbl-products">
+            <caption class="sr-only">Data produk terlaris</caption>
+            <thead><tr><th>Produk</th><th>Unit</th><th>Penjualan (Rp)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Category contribution chart -->
+      <div class="chart-card">
+        <h3>Kontribusi Kategori <span style="font-weight:400;font-size:.8rem;color:var(--muted);">(total penjualan)</span></h3>
+        <div class="chart-area" style="height:200px;">
+          <svg id="chart-categories" class="chart-svg" role="img" aria-label="Grafik kontribusi kategori berdasarkan total penjualan"></svg>
+        </div>
+        <p class="chart-note">Satuan: total penjualan (Rp) setelah diskon per kategori. Bukan laba.</p>
+        <div class="chart-table-wrap" aria-label="Tabel kontribusi kategori">
+          <table class="chart-table" id="tbl-categories">
+            <caption class="sr-only">Data kontribusi kategori</caption>
+            <thead><tr><th>Kategori</th><th>Total Penjualan (Rp)</th><th>%</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <hr class="sect"/>
+
+    <!-- Period comparison -->
+    <section id="compare-section" aria-labelledby="lbl-compare">
+      <h2 id="lbl-compare">Perbandingan Periode</h2>
+      <div id="compare-inputs">
+        <fieldset class="period-block" style="border-color:var(--accent);">
+          <legend>Periode 1</legend>
+          <div class="pr">
+            <label for="p1-from" style="min-width:30px;">Dari</label>
+            <input type="date" id="p1-from" style="flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.82rem;"/>
+            <label for="p1-to" style="min-width:30px;">s/d</label>
+            <input type="date" id="p1-to" style="flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.82rem;"/>
+          </div>
+        </fieldset>
+        <fieldset class="period-block" style="border-color:var(--ok);">
+          <legend>Periode 2</legend>
+          <div class="pr">
+            <label for="p2-from" style="min-width:30px;">Dari</label>
+            <input type="date" id="p2-from" style="flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.82rem;"/>
+            <label for="p2-to" style="min-width:30px;">s/d</label>
+            <input type="date" id="p2-to" style="flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.82rem;"/>
+          </div>
+        </fieldset>
+        <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+          <button id="btn-compare">Bandingkan</button>
+        </div>
+      </div>
+      <div id="compare-result"></div>
+    </section>
+  </section><!-- /page-dashboard -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE: DATA
+  ══════════════════════════════════════════════════════════ -->
+  <section id="page-data" class="page" role="region" aria-labelledby="lbl-data">
+    <h2 id="lbl-data" class="sr-only">Preview Data</h2>
+    <div id="export-bar">
+      <button id="btn-export-csv" aria-label="Unduh data sesuai filter dalam format CSV">⬇ Unduh CSV (filter aktif)</button>
+      <button id="btn-export-txt" aria-label="Unduh ringkasan metrik dalam format TXT">⬇ Unduh Ringkasan TXT</button>
+    </div>
+    <div id="data-controls">
+      <input type="search" id="data-search" placeholder="Cari di data..." aria-label="Cari data"/>
+      <label for="data-page-size" style="font-size:.8rem;white-space:nowrap;">Baris/hal:
+        <select id="data-page-size" aria-label="Jumlah baris per halaman">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <span id="data-row-info" style="font-size:.8rem;color:var(--muted);"></span>
+    </div>
+    <div id="data-table-wrap" tabindex="0" role="region" aria-label="Tabel data penjualan">
+      <table id="data-table" aria-live="polite">
+        <thead>
+          <tr>
+            <th>ID Transaksi</th><th>Tanggal</th><th>ID Produk</th><th>Nama Produk</th>
+            <th>Kategori</th><th>Jumlah</th><th>Harga Satuan</th><th>Diskon</th>
+            <th>Total Penjualan</th><th>Kanal</th><th>Metode Bayar</th>
+          </tr>
+        </thead>
+        <tbody id="data-tbody"></tbody>
+      </table>
+    </div>
+    <div id="pagination" role="navigation" aria-label="Navigasi halaman data"></div>
+    <span id="pagination-info" aria-live="polite"></span>
+  </section><!-- /page-data -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE: AGENT
+  ══════════════════════════════════════════════════════════ -->
+  <section id="page-agent" class="page" role="region" aria-labelledby="lbl-agent">
+    <h2 id="lbl-agent" style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;">
+      Tanya Data — Asisten Berbasis Aturan <span style="font-weight:400;font-size:.8rem;color:var(--muted);">— Semua jawaban dihitung dari dataset aktif</span>
+    </h2>
+    <div id="chat-layout">
+      <div id="chat-main">
+        <div id="chat-history" role="log" aria-label="Riwayat percakapan" aria-live="polite"></div>
+        <div id="chat-loading" aria-live="polite">⏳ Asisten sedang memproses...</div>
+        <div id="chat-input-row">
+          <textarea id="chat-input" rows="1" placeholder="Ketik pertanyaan tentang data penjualan..." aria-label="Pertanyaan untuk asisten"></textarea>
+          <button id="btn-send" aria-label="Kirim pertanyaan">Kirim</button>
+        </div>
+        <p style="font-size:.74rem;color:var(--muted);margin-top:.3rem;">
+          Filter aktif pada dashboard juga berlaku untuk pertanyaan. Tekan Enter untuk kirim.
+        </p>
+      </div>
+      <aside id="chat-sidebar">
+        <div id="sample-questions">
+          <h4>Contoh Pertanyaan</h4>
+          <button class="sample-q">Apa 5 produk terlaris berdasarkan jumlah unit?</button>
+          <button class="sample-q">Berapa total penjualan Agustus 2026?</button>
+          <button class="sample-q">Bandingkan penjualan Agustus dan September 2026.</button>
+          <button class="sample-q">Kategori mana yang memberi kontribusi penjualan terbesar?</button>
+          <button class="sample-q">Bagaimana tren penjualan bulanan?</button>
+          <button class="sample-q">Berapa jumlah transaksi Juli 2026?</button>
+        </div>
+        <div id="followup-area" class="hide" aria-live="polite">
+          <p>Saran pertanyaan lanjutan:</p>
+        </div>
+        <div id="data-status-card" class="not-ready" aria-live="polite">
+          ⏳ Memuat status dataset...
+        </div>
+      </aside>
+    </div>
+  </section><!-- /page-agent -->
+
+</main><!-- /main -->
+</div><!-- /app -->
+
+<!-- Shared tooltip -->
+<div id="chart-tooltip" role="tooltip" aria-hidden="true"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─── Config ───────────────────────────────────────────────────────────────── */
+const API = 'http://localhost:8000';
+
+/* ─── State ────────────────────────────────────────────────────────────────── */
+let state = {
+  meta: null,
+  filter: { date_from:'', date_to:'', kategori:'', kanal:'' },
+  dataPage: 1,
+  dataPageSize: 50,
+  dataSearch: '',
+  chatHistory: [],
+};
+
+/* ─── Utility ──────────────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const fmt = n => new Intl.NumberFormat('id-ID').format(n);
+const fmtRp = n => 'Rp' + fmt(n);
+const fmtPct = v => typeof v === 'number' ? v.toFixed(2) + '%' : String(v);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function buildQS(extra={}) {
+  const p = { ...state.filter, ...extra };
+  const parts = [];
+  for (const [k,v] of Object.entries(p)) if (v) parts.push(`${k}=${encodeURIComponent(v)}`);
+  return parts.length ? '?' + parts.join('&') : '';
+}
+
+async function apiFetch(url, opts={}) {
+  const r = await fetch(API + url, opts);
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+function showToast(msg, type='info') {
+  // lightweight inline toast
+  const d = document.createElement('div');
+  d.style.cssText = `position:fixed;bottom:1.2rem;right:1.2rem;z-index:9999;
+    padding:.55rem 1rem;border-radius:8px;font-size:.82rem;font-weight:600;
+    background:${type==='ok'?'#16a34a':type==='err'?'#dc2626':'#3b82d4'};color:#fff;
+    box-shadow:0 2px 8px #0003;max-width:320px;`;
+  d.textContent = msg;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 4000);
+}
+
+/* ─── Navigation ───────────────────────────────────────────────────────────── */
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $(`page-${btn.dataset.page}`).classList.add('active');
+    if (btn.dataset.page === 'data') refreshDataTable();
+  });
+});
+
+/* ─── Load default CSV ─────────────────────────────────────────────────────── */
+$('btn-load-default').addEventListener('click', async () => {
+  $('btn-load-default').textContent = 'Memuat...';
+  $('btn-load-default').disabled = true;
+  try {
+    const r = await apiFetch('/api/load_default');
+    if (r.ok) {
+      onDataLoaded(r.meta);
+      showToast('Data contoh berhasil dimuat.', 'ok');
+    } else {
+      showValidationErrors(r.errors);
+    }
+  } catch(e) {
+    showToast('Gagal: ' + e.message, 'err');
+  } finally {
+    $('btn-load-default').textContent = 'Gunakan Data Contoh';
+    $('btn-load-default').disabled = false;
+  }
+});
+
+/* ─── Upload CSV ───────────────────────────────────────────────────────────── */
+$('btn-upload-trigger').addEventListener('click', () => $('csv-file-input').click());
+$('csv-file-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('File terlalu besar (maks 5 MB).', 'err'); return;
+  }
+  const buf = await file.arrayBuffer();
+  try {
+    const r = await apiFetch('/api/upload_csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    if (r.ok) {
+      onDataLoaded(r.meta);
+      showToast('Dataset berhasil diunggah dan divalidasi.', 'ok');
+    } else {
+      showValidationErrors(r.errors);
+    }
+  } catch(e) {
+    showToast('Gagal unggah: ' + e.message, 'err');
+  }
+  e.target.value = '';
+});
+
+function showValidationErrors(errors) {
+  const panel = $('validation-panel');
+  const list  = $('validation-list');
+  panel.classList.remove('hide');
+  list.innerHTML = errors.map(e => `<div>• ${esc(e)}</div>`).join('');
+  // keep previous dataset
+}
+
+function onDataLoaded(meta) {
+  $('validation-panel').classList.add('hide');
+  state.meta = meta;
+  $('ds-status').textContent = 'Dimuat ✓';
+  $('ds-status').className = 'ds-status loaded';
+  $('ds-info').textContent =
+    `${fmt(meta.total_rows)} baris · ${meta.date_min} s/d ${meta.date_max}`;
+
+  // populate filter dropdowns
+  const fKat = $('f-kategori');
+  const fKan = $('f-kanal');
+  fKat.innerHTML = '<option value="">Semua Kategori</option>' +
+    meta.categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  fKan.innerHTML = '<option value="">Semua Kanal</option>' +
+    meta.channels.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+  // set default filter dates
+  $('f-date-from').value = meta.date_min;
+  $('f-date-to').value   = meta.date_max;
+  state.filter.date_from = meta.date_min;
+  state.filter.date_to   = meta.date_max;
+
+  // update data readiness badge and assistant status
+  updateDataBadge(true);
+
+  refreshAll();
+}
+
+/* ─── Filter ───────────────────────────────────────────────────────────────── */
+$('btn-apply-filter').addEventListener('click', applyFilter);
+$('btn-reset-filter').addEventListener('click', () => {
+  if (!state.meta) return;
+  $('f-date-from').value = state.meta.date_min;
+  $('f-date-to').value   = state.meta.date_max;
+  $('f-kategori').value  = '';
+  $('f-kanal').value     = '';
+  applyFilter();
+});
+
+function applyFilter() {
+  state.filter = {
+    date_from: $('f-date-from').value,
+    date_to:   $('f-date-to').value,
+    kategori:  $('f-kategori').value,
+    kanal:     $('f-kanal').value,
+  };
+  refreshAll();
+}
+
+function refreshAll() {
+  if (!state.meta) return;
+  loadMetrics();
+  loadTrend();
+  loadTopProducts();
+  loadCategories();
+}
+
+/* ─── Metrics ──────────────────────────────────────────────────────────────── */
+async function loadMetrics() {
+  ['m-total','m-trx','m-units','m-avg'].forEach(id => {
+    const el = $(id); el.textContent = '…';
+  });
+  try {
+    const r = await apiFetch('/api/summary' + buildQS());
+    if (!r.has_data) {
+      ['m-total','m-trx','m-units','m-avg'].forEach(id => $(id).textContent = '—');
+      return;
+    }
+    $('m-total').textContent = fmtRp(r.total_penjualan);
+    $('m-trx').textContent   = fmt(r.jumlah_transaksi);
+    $('m-units').textContent = fmt(r.jumlah_unit);
+    $('m-avg').textContent   = fmtRp(Math.round(r.rata_rata_transaksi));
+  } catch(e) { console.error('loadMetrics', e); }
+}
+
+/* ─── Tooltip ──────────────────────────────────────────────────────────────── */
+const tooltip = $('chart-tooltip');
+function showTip(e, text) {
+  tooltip.textContent = text;
+  tooltip.style.opacity = '1';
+  moveTip(e);
+}
+function moveTip(e) {
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 28) + 'px';
+}
+function hideTip() { tooltip.style.opacity = '0'; }
+
+/* ─── Chart helpers ────────────────────────────────────────────────────────── */
+const COLORS = ['#3b82d4','#7c5cd8','#16a34a','#d97706','#dc2626','#0891b2','#be185d'];
+
+function svgEl(tag, attrs={}) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+/* ── LINE CHART (trend) ─────────────────────────────────────────────────── */
+function drawLineChart(svgId, data, xKey, yKey, color='#3b82d4') {
+  const svg = $(svgId);
+  svg.innerHTML = '';
+  if (!data || !data.length) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="13">Tidak ada data</text>'; return; }
+
+  const W = svg.parentElement.clientWidth || 600;
+  const H = 200;
+  const PAD = { t:20, r:20, b:52, l:72 };
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const vals = data.map(d => d[yKey]);
+  const maxV = Math.max(...vals) || 1;
+  const minV = Math.min(0, Math.min(...vals));
+
+  // grid
+  const ticks = 4;
+  for (let i=0; i<=ticks; i++) {
+    const y = PAD.t + cH - (i/ticks)*cH;
+    const v = minV + (maxV-minV)*(i/ticks);
+    const line = svgEl('line',{x1:PAD.l,x2:PAD.l+cW,y1:y,y2:y,stroke:'#e5e7eb','stroke-width':'1'});
+    svg.appendChild(line);
+    const txt = svgEl('text',{x:PAD.l-6,y:y+4,'text-anchor':'end',fill:'#9ca3af','font-size':'10'});
+    txt.textContent = fmtRp(Math.round(v));
+    svg.appendChild(txt);
+  }
+
+  // x-labels (sample every nth)
+  const maxLabels = Math.floor(cW / 50);
+  const step = Math.max(1, Math.ceil(data.length / maxLabels));
+
+  // polyline points
+  const pts = data.map((d,i) => {
+    const x = PAD.l + (i/(data.length-1||1))*cW;
+    const y = PAD.t + cH - ((d[yKey]-minV)/(maxV-minV||1))*cH;
+    return [x,y];
+  });
+
+  // area fill
+  const areaPath = `M${pts[0][0]},${PAD.t+cH} ` +
+    pts.map(([x,y])=>`L${x},${y}`).join(' ') +
+    ` L${pts[pts.length-1][0]},${PAD.t+cH} Z`;
+  const areaEl = svgEl('path',{d:areaPath,fill:color+'22',stroke:'none'});
+  svg.appendChild(areaEl);
+
+  // line
+  const lineEl = svgEl('polyline',{
+    points: pts.map(([x,y])=>`${x},${y}`).join(' '),
+    fill:'none', stroke:color, 'stroke-width':'2', 'stroke-linejoin':'round',
+  });
+  svg.appendChild(lineEl);
+
+  // dots + tooltips
+  data.forEach((d,i) => {
+    const [x,y] = pts[i];
+    // x-label
+    if (i % step === 0 || i === data.length-1) {
+      const xt = svgEl('text',{x:x,y:H-PAD.b+14,'text-anchor':'middle',fill:'#9ca3af','font-size':'9',transform:`rotate(-30,${x},${H-PAD.b+14})`});
+      xt.textContent = d[xKey];
+      svg.appendChild(xt);
+    }
+    const dot = svgEl('circle',{cx:x,cy:y,r:'4',fill:color,stroke:'#fff','stroke-width':'1.5',cursor:'pointer'});
+    dot.addEventListener('mouseenter', e => showTip(e, `${d[xKey]}: ${fmtRp(d[yKey])}`));
+    dot.addEventListener('mousemove', moveTip);
+    dot.addEventListener('mouseleave', hideTip);
+    svg.appendChild(dot);
+  });
+}
+
+/* ── BAR CHART (products) ────────────────────────────────────────────────── */
+function drawBarChart(svgId, data, labelKey, valueKey, color='#7c5cd8') {
+  const svg = $(svgId);
+  svg.innerHTML = '';
+  if (!data || !data.length) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="13">Tidak ada data</text>'; return; }
+
+  const W = svg.parentElement.clientWidth || 380;
+  const H = 200;
+  const PAD = { t:10, r:20, b:20, l:130 };
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const maxV = Math.max(...data.map(d=>d[valueKey])) || 1;
+  const barH = Math.max(4, (cH / data.length) - 6);
+
+  data.forEach((d,i) => {
+    const y  = PAD.t + i*(cH/data.length) + (cH/data.length - barH)/2;
+    const bW = (d[valueKey]/maxV)*cW;
+
+    // label
+    const lbl = svgEl('text',{x:PAD.l-6,y:y+barH/2+4,'text-anchor':'end',fill:'#57606a','font-size':'11'});
+    lbl.textContent = String(d[labelKey]).length>18 ? String(d[labelKey]).slice(0,16)+'…' : d[labelKey];
+    svg.appendChild(lbl);
+
+    // bar
+    const bar = svgEl('rect',{x:PAD.l,y,width:bW,height:barH,rx:'3',fill:color,cursor:'pointer'});
+    bar.addEventListener('mouseenter', e => showTip(e, `${d[labelKey]}: ${fmt(d[valueKey])}`));
+    bar.addEventListener('mousemove', moveTip);
+    bar.addEventListener('mouseleave', hideTip);
+    svg.appendChild(bar);
+
+    // value label
+    const vl = svgEl('text',{x:PAD.l+bW+4,y:y+barH/2+4,fill:'#57606a','font-size':'10'});
+    vl.textContent = fmt(d[valueKey]);
+    svg.appendChild(vl);
+  });
+}
+
+/* ── PIE / DONUT CHART (categories) ─────────────────────────────────────── */
+function drawPieChart(svgId, data, labelKey, valueKey) {
+  const svg = $(svgId);
+  svg.innerHTML = '';
+  if (!data || !data.length) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="13">Tidak ada data</text>'; return; }
+
+  const W = svg.parentElement.clientWidth || 380;
+  const H = 200;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const cx = W * 0.33, cy = H/2, r = Math.min(cx, cy) - 16, ri = r * 0.52;
+  const total = data.reduce((s,d)=>s+d[valueKey],0) || 1;
+  let angle = -Math.PI/2;
+
+  data.forEach((d,i) => {
+    const sweep = (d[valueKey]/total)*2*Math.PI;
+    const x1 = cx + r*Math.cos(angle), y1 = cy + r*Math.sin(angle);
+    angle += sweep;
+    const x2 = cx + r*Math.cos(angle), y2 = cy + r*Math.sin(angle);
+    const xi1 = cx + ri*Math.cos(angle-sweep), yi1 = cy + ri*Math.sin(angle-sweep);
+    const xi2 = cx + ri*Math.cos(angle), yi2 = cy + ri*Math.sin(angle);
+    const lg = sweep > Math.PI ? 1 : 0;
+    const path = `M${x1},${y1} A${r},${r} 0 ${lg},1 ${x2},${y2} L${xi2},${yi2} A${ri},${ri} 0 ${lg},0 ${xi1},${yi1} Z`;
+    const el = svgEl('path',{d:path,fill:COLORS[i%COLORS.length],stroke:'#fff','stroke-width':'2',cursor:'pointer'});
+    el.addEventListener('mouseenter', e => showTip(e, `${d[labelKey]}: ${fmtRp(d[valueKey])} (${d.persen}%)`));
+    el.addEventListener('mousemove', moveTip);
+    el.addEventListener('mouseleave', hideTip);
+    svg.appendChild(el);
+  });
+
+  // centre text
+  const ct = svgEl('text',{x:cx,y:cy+4,'text-anchor':'middle',fill:'#57606a','font-size':'11','font-weight':'600'});
+  ct.textContent = 'Total';
+  svg.appendChild(ct);
+
+  // legend
+  const legX = W*0.62, legYStart = H/2 - (data.length*18)/2;
+  data.forEach((d,i) => {
+    const ly = legYStart + i*18;
+    const box = svgEl('rect',{x:legX,y:ly-10,width:12,height:12,rx:'2',fill:COLORS[i%COLORS.length]});
+    svg.appendChild(box);
+    const lt = svgEl('text',{x:legX+16,y:ly,'font-size':'11',fill:'#57606a'});
+    lt.textContent = `${d[labelKey]} (${d.persen}%)`;
+    svg.appendChild(lt);
+  });
+}
+
+/* ─── Trend chart ──────────────────────────────────────────────────────────── */
+async function loadTrend() {
+  const gran = document.querySelector('input[name="granularity"]:checked')?.value || 'harian';
+  $('trend-label').textContent = gran === 'harian' ? '(Harian)' : '(Bulanan)';
+  try {
+    const r = await apiFetch('/api/trend' + buildQS({ granularity: gran }));
+    const data = r.trend || [];
+    drawLineChart('chart-trend', data, 'periode', 'total_penjualan');
+    // table
+    const tbody = document.querySelector('#tbl-trend tbody');
+    tbody.innerHTML = data.map(d =>
+      `<tr><td>${esc(d.periode)}</td><td>${fmtRp(d.total_penjualan)}</td><td>${fmt(d.jumlah_transaksi)}</td><td>${fmt(d.jumlah_unit)}</td></tr>`
+    ).join('') || '<tr><td colspan="4" style="color:var(--muted);padding:.5rem;">Tidak ada data</td></tr>';
+  } catch(e) { console.error('loadTrend', e); }
+}
+
+document.querySelectorAll('input[name="granularity"]').forEach(r =>
+  r.addEventListener('change', loadTrend));
+
+/* ─── Top products ─────────────────────────────────────────────────────────── */
+async function loadTopProducts() {
+  try {
+    const r = await apiFetch('/api/top_products' + buildQS({ top_n:8, by:'unit' }));
+    const data = r.products || [];
+    drawBarChart('chart-products', data, 'nama_produk', 'jumlah_unit');
+    const tbody = document.querySelector('#tbl-products tbody');
+    tbody.innerHTML = data.map(d =>
+      `<tr><td>${esc(d.nama_produk)}</td><td>${fmt(d.jumlah_unit)}</td><td>${fmtRp(d.total_penjualan)}</td></tr>`
+    ).join('') || '<tr><td colspan="3" style="color:var(--muted);">Tidak ada data</td></tr>';
+  } catch(e) { console.error('loadTopProducts', e); }
+}
+
+/* ─── Category contribution ────────────────────────────────────────────────── */
+async function loadCategories() {
+  try {
+    const r = await apiFetch('/api/category_contribution' + buildQS());
+    const data = r.categories || [];
+    drawPieChart('chart-categories', data, 'kategori', 'total_penjualan');
+    const tbody = document.querySelector('#tbl-categories tbody');
+    tbody.innerHTML = data.map(d =>
+      `<tr><td>${esc(d.kategori)}</td><td>${fmtRp(d.total_penjualan)}</td><td>${d.persen}%</td></tr>`
+    ).join('') || '<tr><td colspan="3" style="color:var(--muted);">Tidak ada data</td></tr>';
+  } catch(e) { console.error('loadCategories', e); }
+}
+
+/* ─── Period comparison ────────────────────────────────────────────────────── */
+$('btn-compare').addEventListener('click', async () => {
+  const body = {
+    period1_from: $('p1-from').value,
+    period1_to:   $('p1-to').value,
+    period2_from: $('p2-from').value,
+    period2_to:   $('p2-to').value,
+    kategori: state.filter.kategori || null,
+    kanal:    state.filter.kanal    || null,
+  };
+  if (!body.period1_from || !body.period1_to || !body.period2_from || !body.period2_to) {
+    showToast('Isi semua tanggal periode.', 'err'); return;
+  }
+  try {
+    const r = await apiFetch('/api/compare', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    renderCompare(r);
+  } catch(e) { showToast('Gagal: '+e.message,'err'); }
+});
+
+function renderCompare(r) {
+  const p1 = r.periode_1, p2 = r.periode_2, ch = r.perubahan;
+  const d1 = p1.data, d2 = p2.data;
+
+  function cell(label, key, formatFn) {
+    const v1 = d1 ? d1[key] : null;
+    const v2 = d2 ? d2[key] : null;
+    const pct = ch[key];
+    const pctNum = typeof pct === 'number' ? pct : null;
+    const pctClass = pctNum === null ? 'na' : pctNum >= 0 ? 'up' : 'dn';
+    const arrow = pctNum === null ? '' : pctNum >= 0 ? '↑' : '↓';
+    const p1Label = d1 ? formatFn(v1) : 'Tidak ada data';
+    const p2Label = d2 ? formatFn(v2) : 'Tidak ada data';
+    return `
+      <div class="compare-cell">
+        <div class="cc-label">${esc(label)}</div>
+        <div class="cc-vals">
+          <span class="cc-v1">${p1Label}</span>
+          <span class="cc-arr">→</span>
+          <span class="cc-v2">${p2Label}</span>
+        </div>
+        <div class="cc-pct ${pctClass}">${arrow} ${typeof pct==='number' ? Math.abs(pct).toFixed(2)+'%' : esc(String(pct))}</div>
+      </div>`;
+  }
+
+  $('compare-result').innerHTML = `
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem;">
+      Periode 1: <strong>${p1.from} s/d ${p1.to}</strong> &nbsp;|&nbsp;
+      Periode 2: <strong>${p2.from} s/d ${p2.to}</strong>
+      ${r.filter.kategori ? ' &nbsp;| Kategori: '+esc(r.filter.kategori) : ''}
+      ${r.filter.kanal    ? ' &nbsp;| Kanal: '+esc(r.filter.kanal)      : ''}
+    </p>
+    <div class="compare-grid">
+      ${cell('Total Penjualan (Rp)', 'total_penjualan', fmtRp)}
+      ${cell('Jumlah Transaksi Unik', 'jumlah_transaksi', fmt)}
+      ${cell('Jumlah Unit Terjual', 'jumlah_unit', fmt)}
+    </div>`;
+}
+
+/* ─── Data table ───────────────────────────────────────────────────────────── */
+let searchDebounce;
+$('data-search').addEventListener('input', e => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    state.dataSearch = e.target.value;
+    state.dataPage = 1;
+    refreshDataTable();
+  }, 300);
+});
+$('data-page-size').addEventListener('change', e => {
+  state.dataPageSize = parseInt(e.target.value);
+  state.dataPage = 1;
+  refreshDataTable();
+});
+
+async function refreshDataTable() {
+  if (!state.meta) return;
+  const qs = buildQS({
+    page: state.dataPage,
+    page_size: state.dataPageSize,
+    search: state.dataSearch,
+  });
+  try {
+    const r = await apiFetch('/api/rows' + qs);
+    const tbody = $('data-tbody');
+    tbody.innerHTML = r.rows.map(row => `
+      <tr>
+        <td>${esc(row.id_transaksi)}</td>
+        <td>${esc(row.tanggal)}</td>
+        <td>${esc(row.id_produk)}</td>
+        <td>${esc(row.nama_produk)}</td>
+        <td>${esc(row.kategori)}</td>
+        <td style="text-align:right">${fmt(row.jumlah)}</td>
+        <td style="text-align:right">${fmtRp(row.harga_satuan)}</td>
+        <td style="text-align:right">${fmtRp(row.diskon)}</td>
+        <td style="text-align:right">${fmtRp(row.total_penjualan)}</td>
+        <td>${esc(row.kanal_penjualan)}</td>
+        <td>${esc(row.metode_pembayaran)}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="11" style="text-align:center;padding:1rem;color:var(--muted);">Tidak ada data</td></tr>';
+
+    $('data-row-info').textContent = `${fmt(r.total)} baris ditemukan`;
+
+    // pagination
+    const pg = $('pagination');
+    pg.innerHTML = '';
+    if (r.total_pages > 1) {
+      const addBtn = (label, pageNum, isCurrent=false, disabled=false) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        if (isCurrent) b.classList.add('current');
+        if (disabled) b.disabled = true;
+        b.addEventListener('click', () => { state.dataPage = pageNum; refreshDataTable(); });
+        pg.appendChild(b);
+      };
+      addBtn('‹', state.dataPage-1, false, state.dataPage===1);
+      const total = r.total_pages;
+      const cur = state.dataPage;
+      let pages = new Set([1, total, cur-1, cur, cur+1].filter(p=>p>=1&&p<=total));
+      let prev = 0;
+      [...pages].sort((a,b)=>a-b).forEach(p => {
+        if (prev && p-prev > 1) { const el=document.createElement('span'); el.textContent='…'; el.style.padding='.3rem .4rem'; pg.appendChild(el); }
+        addBtn(p, p, p===cur);
+        prev=p;
+      });
+      addBtn('›', state.dataPage+1, false, state.dataPage===r.total_pages);
+      $('pagination-info').textContent = `Halaman ${cur} dari ${total}`;
+    }
+  } catch(e) { console.error('refreshDataTable',e); }
+}
+
+/* ─── Export ───────────────────────────────────────────────────────────────── */
+$('btn-export-csv').addEventListener('click', () => {
+  if (!state.meta) { showToast('Belum ada dataset.','err'); return; }
+  window.location.href = API + '/api/export_csv' + buildQS();
+});
+$('btn-export-txt').addEventListener('click', () => {
+  if (!state.meta) { showToast('Belum ada dataset.','err'); return; }
+  window.location.href = API + '/api/export_summary' + buildQS();
+});
+
+/* ─── Data readiness status ─────────────────────────────────────────────────── */
+function updateDataBadge(hasData) {
+  const badge = $('data-badge');
+  const card  = $('data-status-card');
+  if (hasData) {
+    badge.textContent = '✓ Dataset siap';
+    badge.className = 'ready';
+    card.className = '';
+    card.innerHTML = '✓ <strong>Dataset siap.</strong> Asisten berbasis aturan aktif dan siap menjawab pertanyaan analisis.';
+  } else {
+    badge.textContent = 'Dataset belum dimuat';
+    badge.className = 'not-ready';
+    card.className = 'not-ready';
+    card.innerHTML = '⚠️ <strong>Dataset belum dimuat.</strong><br/>Klik "Gunakan Data Contoh" atau "Unggah CSV" di atas untuk memuat data sebelum bertanya.';
+  }
+}
+
+/* ─── Simple markdown bold renderer ─────────────────────────────────────────── */
+function renderMarkdown(text) {
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\n/g, '<br/>');
+}
+
+/* ─── Chat helpers ──────────────────────────────────────────────────────────── */
+function addChatMsg(role, html, steps=[]) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  div.innerHTML = html;
+  if (steps && steps.length) {
+    const det = document.createElement('details');
+    det.className = 'msg-steps';
+    const sum = document.createElement('summary');
+    sum.textContent = `Fungsi digunakan: ${steps[0].function}`;
+    det.appendChild(sum);
+    steps.forEach(s => {
+      const p = document.createElement('div');
+      p.style.marginTop = '.3rem';
+      const params = s.params || {};
+      const pStr = [
+        params.date_from ? `dari: ${params.date_from}` : '',
+        params.date_to   ? `s/d: ${params.date_to}`    : '',
+        params.kategori  ? `kategori: ${params.kategori}` : '',
+        params.kanal     ? `kanal: ${params.kanal}` : '',
+      ].filter(Boolean).join(', ');
+      p.innerHTML = `<span style="color:#57606a">${pStr || 'seluruh dataset'}</span>`;
+      det.appendChild(p);
+    });
+    div.appendChild(det);
+  }
+  $('chat-history').appendChild(div);
+  $('chat-history').scrollTop = $('chat-history').scrollHeight;
+  return div;
+}
+
+function renderFollowup(suggestions) {
+  const area = $('followup-area');
+  // remove old followup buttons but keep the <p> label
+  area.querySelectorAll('.followup-btn').forEach(b => b.remove());
+  if (!suggestions || !suggestions.length) { area.classList.add('hide'); return; }
+  area.classList.remove('hide');
+  suggestions.forEach(q => {
+    const btn = document.createElement('button');
+    btn.className = 'followup-btn';
+    btn.textContent = q;
+    btn.addEventListener('click', () => {
+      $('chat-input').value = q;
+      $('chat-input').focus();
+    });
+    area.appendChild(btn);
+  });
+}
+
+async function sendQuestion(q) {
+  if (!q.trim()) return;
+  if (!state.meta) {
+    addChatMsg('system', '⚠️ Muat dataset terlebih dahulu sebelum bertanya.');
+    return;
+  }
+  addChatMsg('user', esc(q));
+  $('chat-input').value = '';
+  $('chat-loading').style.display = 'block';
+  $('btn-send').disabled = true;
+
+  try {
+    const r = await fetch(API + '/api/agent', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ question:q, filter:state.filter }),
+    });
+    const data = await r.json();
+    if (data.error) {
+      addChatMsg('system', `❌ ${esc(data.error)}`);
+    } else {
+      addChatMsg('assistant', renderMarkdown(data.answer || ''), data.steps || []);
+      renderFollowup(data.followup || []);
+    }
+  } catch(e) {
+    addChatMsg('system', `❌ Tidak dapat menghubungi server: ${esc(e.message)}`);
+  } finally {
+    $('chat-loading').style.display = 'none';
+    $('btn-send').disabled = false;
+    $('chat-input').focus();
+  }
+}
+
+$('btn-send').addEventListener('click', () => sendQuestion($('chat-input').value));
+$('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuestion($('chat-input').value); }
+});
+document.querySelectorAll('.sample-q').forEach(btn =>
+  btn.addEventListener('click', () => sendQuestion(btn.textContent)));
+
+/* ─── Init ─────────────────────────────────────────────────────────────────── */
+async function init() {
+  updateDataBadge(false);
+  // try to load default data automatically on startup
+  try {
+    const r = await apiFetch('/api/load_default');
+    if (r.ok) onDataLoaded(r.meta);
+  } catch(_) {}
+}
+
+window.addEventListener('resize', () => {
+  if (state.meta) {
+    loadTrend();
+    loadTopProducts();
+    loadCategories();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
